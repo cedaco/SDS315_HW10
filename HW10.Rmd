@@ -1,0 +1,142 @@
+---
+title: "HW10"
+author: "Cesar Dao (cad4837)"
+date: "2024-04-25"
+output: pdf_document
+---
+[Repository Link](https://github.com/cedaco/SDS315_HW10)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(ggplot2)
+library(mosaic)
+library(tidyverse)
+library(knitr)
+library(MatchIt)
+setwd("/Users/cesar/Desktop/SDS315")
+red = read.csv("redlining.csv")
+grocery = read.csv("groceries.csv")
+
+```
+
+# Question 1
+
+## The Question
+We are trying to answer if there is an association with the amount of FAIR policies and the racial/ethnic composition of a zip code in Chicago, IL. Since race may not only be the only thing associated with the amount of FAIR policies, we have to adjust for variables such as rate of fires, house age, and median income.
+
+## Approach
+I created an lm that looks for the correlation between the amount of FAIR policies in a zip code vs the zip code's racial composition, adjusting for fire rate, home age, and median income.
+
+## Results
+```{r, echo = FALSE}
+fair_model = lm(policies ~ minority + fire + age + income, data = red)
+
+summary(fair_model)
+```
+
+## Conclusion
+The p values for the distribution of the amount of policies vs minority percentage and the amount of policies vs rate of fires in the zip code were both statistically significant, with p values under 0.05. On the contrary, the relationships of amount of policies vs median income and the amount of policies vs home age were not statistically significant, with p values over 0.05. However, our entire adjusted distribution's p value was 7.041e-08, which is under 0.05, which says that even after adjusting for fire rate, home age, and median income, there is still a statistically significant relationship between the percentage of minorities in a zip code and the amount of FAIR policies.
+
+# Question 2
+
+## Part A
+```{r, echo = FALSE}
+avg_price = grocery %>%
+  group_by(Store) %>%
+  summarize(avg_price = mean(Price, na.rm = TRUE)) %>%
+  arrange(desc(avg_price))
+
+ggplot(avg_price, aes(x = avg_price, y = Store)) + geom_bar(stat = "identity", fill = "skyblue") + coord_flip() + labs(title = "Average Price of Products by Store", x = "Average Price ($)", y = "Store") +  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+
+```
+Whole foods appears to have the highest average price of products, nearing 4 dollars, shortly followed by the Wheatsville Co-Op. At A little over 2 dollars, Fiesta appears to have the cheapest average item price.
+
+## Part B
+```{r, echo = FALSE}
+num_stores = grocery %>%
+  group_by(Product) %>%
+  summarize(num_stores = n_distinct(Store))
+
+ggplot(num_stores, aes(x = num_stores, y = Product)) + geom_bar(stat = "identity", fill = "skyblue") + labs(title = "Number of Stores Selling Each Product", x = "Number of Stores", y = "Product")
+```
+Egg cartons, Horizon 2% milk cartons, and Iodized Salt appear to be the products that appear in the most amount of stores. Frosted Flakes (5 lb and 1 lb) and 1lb Cinnamon Toast Crunch appear to be the hardest products to find; they are all tied for being in the least amount of stores.
+
+## Part C
+```{r, echo = FALSE}
+model_c = lm(Price ~ Product + Type, data = grocery)
+
+
+confint = round(confint(model_c), 2)
+confint
+
+
+print("Compared with ordinary grocery stores (like Albertsons, HEB, or Krogers), convenience stores charge somewhere between -$5.48 and 7.53 dollars more for the same product.")
+
+
+```
+
+
+## Part D
+```{r, echo = FALSE}
+model_store = lm(Price ~ Product + Store, data = grocery)
+
+confint = round(confint(model_store), 2)
+confint
+print("Kroger Fresh Fare and Walmart seem to charge the least for the same product, while Whole Foods and Wheatsville seem to charge the most for the same product")
+```
+
+## Part E
+```{r, echo = FALSE}
+# Extract coefficients for HEB and Central Market
+coefficients_store = coef(summary(model_store))
+
+# Extract coefficients for H-E-B and Central Market
+heb_coef  = -0.64595932
+central_market_coef = -0.57338651
+
+# Output the coefficients
+cat("H-E-B coefficient:", heb_coef, "\n")
+cat("Central Market coefficient:", central_market_coef, "\n")
+
+# Compare the coefficients
+if (central_market_coef > heb_coef) {
+  cat("Central Market charges more than H-E-B for the same product.")
+} else if (central_market_coef < heb_coef) {
+  cat("Central Market charges a similar amount to H-E-B for the same product.")
+} else {
+  cat("The coefficients for Central Market and H-E-B are equal, suggesting that there are no difference in prices.")
+}
+
+
+```
+
+## Part F
+```{r, echo = FALSE}
+grocery = grocery %>% 
+  mutate(Income10K = Income / 10000)
+
+model_income = lm(Price ~ Product + Income10K, data = grocery)
+
+coefficients_income = coef(summary(model_income))
+
+income_coef = coefficients_income["Income10K", "Estimate"]
+if (income_coef > 0) {
+  cat("Consumers in poorer ZIP codes appear to pay more for the same product, on average. The coefficient is positive, showing that as income increases, price too increases.")
+} else if (income_coef < 0) {
+  cat("Consumers in poorer ZIP codes appear to pay less for the same product, on average. The coefficient is negative, showing that as income increases, price also decreases.")
+} else {
+  cat("Income does not seem to have any significant effect on price.")
+}
+
+income_se = coefficients_income["Income10K", "Std. Error"]
+income_sd = sd(grocery$Income10K)
+estimated_effect = income_coef * income_sd / income_se
+
+# Output the result
+cat(" A one standard deviation increase in the income of a ZIP code seems to be associated with a",
+    round(estimated_effect, 2), "standard deviation change in the price that consumers in that ZIP code can expect to pay for the same product.")
+```
